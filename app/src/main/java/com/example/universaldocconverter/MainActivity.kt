@@ -159,14 +159,17 @@ class MainActivity : Activity() {
                 val prefix = "${base}_$stamp"
                 val tick: (Int) -> Unit = { value -> runOnUiThread { progress.progress = value } }
                 var count = 1
+                var outputName = "$prefix.$format"
                 when (mode) {
                     DocumentEngine.Mode.WORD_PDF -> {
                         DocumentEngine.wordToPdf(input, ext, generated, tick)
-                        saveFile(tree, "$prefix.pdf", "application/pdf", generated)
+                        outputName = "$prefix.pdf"
+                        saveFile(tree, outputName, "application/pdf", generated)
                     }
                     DocumentEngine.Mode.PDF_WORD -> {
                         DocumentEngine.pdfToDocx(input, generated, tick)
-                        saveFile(tree, "$prefix.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", generated)
+                        outputName = "$prefix.docx"
+                        saveFile(tree, outputName, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", generated)
                     }
                     DocumentEngine.Mode.WORD_IMAGE -> {
                         DocumentEngine.wordToPdf(input, ext, generated) { tick(it / 2) }
@@ -174,7 +177,7 @@ class MainActivity : Activity() {
                     }
                     DocumentEngine.Mode.PDF_IMAGE -> count = renderImages(input, tree, prefix, tick)
                 }
-                val message = "$name → ${if (count == 1) prefix else "$count 张图片"}"
+                val message = "$name → ${if (count == 1) outputName else "$count 张图片（$prefix）"}"
                 val old = preferences.getString("history", "") ?: ""
                 preferences.edit().putString("history", (message + "\n" + old).lines().take(20).joinToString("\n")).apply()
                 runOnUiThread {
@@ -242,14 +245,15 @@ class MainActivity : Activity() {
 
     private fun openFolder(tree: Uri) {
         try {
-            startActivity(Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(tree, "vnd.android.document/directory")
+            val directory = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+            startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "*/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, directory)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             })
         } catch (_: Exception) {
-            startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, tree)
-            })
+            Toast.makeText(this, "无法打开系统文件选择器，请用手机文件管理器查看保存目录", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -258,3 +262,4 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 }
+
